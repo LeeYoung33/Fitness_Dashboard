@@ -190,3 +190,26 @@ textarea { width: 100%; resize: vertical; font-family: ui-monospace, monospace; 
 .status-line.error { color: var(--danger); }
 
 hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.login-card { width: 100%; max-width: 360px; }
+.login-title { text-align: center; margin-top: 0; }
+
+.unit-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.unit-btn {
+  background: var(--card-bg);
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.unit-btn + .unit-btn { border-left: 1px solid var(--border); }
+.unit-btn.active { background: var(--primary); color: white; }

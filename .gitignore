@@ -1,4 +1,6 @@
 .env
-strava-config.local.js
+.env.local
 *.log
 .DS_Store
+.vercel
+node_modules

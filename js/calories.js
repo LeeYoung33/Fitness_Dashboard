@@ -80,7 +80,9 @@ const Calories = (() => {
     Storage.set(Keys.PROFILE, profile);
     renderBmi();
     renderSummary();
+    renderHistory();
     renderTrend();
+    if (typeof Gym !== 'undefined') Gym.refreshAll();
   }
 
   function renderBmi() {
@@ -145,8 +147,7 @@ const Calories = (() => {
   function renderSummary() {
     const profile = getProfile();
     const totals = totalsForDate(selectedDate);
-    const exerciseCal = (typeof Strava !== 'undefined' && Strava.isConnected())
-      ? Strava.getExerciseCaloriesForDate(selectedDate) : 0;
+    const exerciseCal = (typeof Gym !== 'undefined') ? Gym.getCaloriesBurnedForDate(selectedDate) : 0;
 
     document.getElementById('summaryDateLabel').textContent = `(${formatDateLabel(selectedDate)})`;
     document.getElementById('sumConsumed').textContent = Math.round(totals.calories);
@@ -185,7 +186,7 @@ const Calories = (() => {
     body.innerHTML = '';
     dates.forEach(iso => {
       const totals = totalsForDate(iso);
-      const exerciseCal = (typeof Strava !== 'undefined') ? Strava.getExerciseCaloriesForDate(iso) : 0;
+      const exerciseCal = (typeof Gym !== 'undefined') ? Gym.getCaloriesBurnedForDate(iso) : 0;
       const net = (profile.calorieLimit || 0) + exerciseCal - totals.calories;
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -238,6 +239,12 @@ const Calories = (() => {
     return div.innerHTML;
   }
 
+  function getWeightKg() {
+    const p = getProfile();
+    if (!p.weight) return null;
+    return p.weightUnit === 'lb' ? p.weight * 0.453592 : p.weight;
+  }
+
   function init() {
     document.getElementById('foodDatePicker').value = selectedDate;
     document.getElementById('foodDatePicker').addEventListener('change', (e) => setSelectedDate(e.target.value));
@@ -252,5 +259,5 @@ const Calories = (() => {
     renderTrend();
   }
 
-  return { init, renderSummary, renderHistory, renderTrend };
+  return { init, renderSummary, renderHistory, renderTrend, getWeightKg };
 })();

@@ -2,8 +2,7 @@ const Keys = {
   PROFILE: 'fd_profile',
   FOOD_LOG: 'fd_food_log',
   GYM_LOG: 'fd_gym_log',
-  STRAVA_AUTH: 'fd_strava_auth',
-  STRAVA_ACTIVITIES: 'fd_strava_activities'
+  GYM_SESSIONS: 'fd_gym_sessions'
 };
 
 const Storage = {

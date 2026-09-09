@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+(function () {
+  try {
+    var auth = JSON.parse(localStorage.getItem('fd_auth') || 'null');
+    if (auth && auth.expiresAt && Date.now() < auth.expiresAt) {
+      window.location.replace('index.html');
+    }
+  } catch (e) {}
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness Dashboard - Log In</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="login-wrap">
+  <div class="card login-card">
+    <h1 class="login-title">Fitness Dashboard</h1>
+    <form id="loginForm" class="form-grid">
+      <label>Name
+        <input type="text" id="loginName" autocomplete="username" required>
+      </label>
+      <label>PIN
+        <input type="password" id="loginPin" inputmode="numeric" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn btn-primary">Log In</button>
+    </form>
+    <p id="loginError" class="status-line error" hidden></p>
+  </div>
+</div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('loginError');
+  errEl.hidden = true;
+  const name = document.getElementById('loginName').value.trim();
+  const pin = document.getElementById('loginPin').value.trim();
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pin })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    localStorage.setItem('fd_auth', JSON.stringify({ name: data.name, expiresAt: data.expiresAt }));
+    window.location.replace('index.html');
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+  }
+});
+</script>
+</body>
+</html>

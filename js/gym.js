@@ -1,12 +1,22 @@
 const Gym = (() => {
   let previewRows = [];
   let exerciseChart = null;
+  let displayUnit = Storage.get('fd_gym_unit', 'lb');
+
+  const MET = { light: 3.5, moderate: 5.0, vigorous: 6.0 };
+  const DEFAULT_WEIGHT_KG = 75;
 
   function getLog() {
     return Storage.get(Keys.GYM_LOG, []);
   }
   function saveLog(entries) {
     Storage.set(Keys.GYM_LOG, entries);
+  }
+  function getSessions() {
+    return Storage.get(Keys.GYM_SESSIONS, {});
+  }
+  function saveSessions(sessions) {
+    Storage.set(Keys.GYM_SESSIONS, sessions);
   }
 
   // ---------- Parsing ----------
@@ -132,6 +142,16 @@ const Gym = (() => {
     const existing = getLog();
     const cleaned = previewRows.filter(r => r.exercise && r.weight > 0 && r.reps > 0);
     saveLog(existing.concat(cleaned));
+
+    // Ensure every new session date has a default duration/intensity so it
+    // immediately contributes to that day's calorie budget.
+    const sessions = getSessions();
+    const newDates = new Set(cleaned.map(r => r.date));
+    newDates.forEach(date => {
+      if (!sessions[date]) sessions[date] = { minutes: 45, intensity: 'moderate' };
+    });
+    saveSessions(sessions);
+
     previewRows = [];
     document.getElementById('gymPreviewCard').hidden = true;
     document.getElementById('gymPasteBox').value = '';
@@ -143,15 +163,37 @@ const Gym = (() => {
     document.getElementById('gymPreviewCard').hidden = true;
   }
 
+  // ---------- Unit display toggle ----------
+
+  function toLb(weight, unit) {
+    return unit === 'kg' ? weight * 2.20462 : weight;
+  }
+  function toKg(weight, unit) {
+    return unit === 'lb' ? weight * 0.453592 : weight;
+  }
+  function convertToDisplay(weight, unit) {
+    return displayUnit === 'kg' ? toKg(weight, unit) : toLb(weight, unit);
+  }
+
+  function initUnitToggle() {
+    const wrap = document.getElementById('gymUnitToggle');
+    wrap.querySelectorAll('.unit-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.unit === displayUnit);
+      btn.addEventListener('click', () => {
+        displayUnit = btn.dataset.unit;
+        Storage.set('fd_gym_unit', displayUnit);
+        wrap.querySelectorAll('.unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit === displayUnit));
+        renderExerciseChart();
+        renderLogTable();
+      });
+    });
+  }
+
   // ---------- Exercise progress ----------
 
   function uniqueExercises() {
     const names = new Set(getLog().map(e => e.exercise));
     return Array.from(names).sort();
-  }
-
-  function toLb(weight, unit) {
-    return unit === 'kg' ? weight * 2.20462 : weight;
   }
 
   function epley1RM(weight, reps) {
@@ -172,10 +214,10 @@ const Gym = (() => {
     const entries = getLog().filter(e => e.exercise === exercise);
     const byDate = {};
     entries.forEach(e => {
-      const lb = toLb(e.weight, e.unit);
+      const w = convertToDisplay(e.weight, e.unit);
       if (!byDate[e.date]) byDate[e.date] = { maxWeight: 0, best1rm: 0 };
-      byDate[e.date].maxWeight = Math.max(byDate[e.date].maxWeight, lb);
-      byDate[e.date].best1rm = Math.max(byDate[e.date].best1rm, epley1RM(lb, e.reps));
+      byDate[e.date].maxWeight = Math.max(byDate[e.date].maxWeight, w);
+      byDate[e.date].best1rm = Math.max(byDate[e.date].best1rm, epley1RM(w, e.reps));
     });
     const dates = Object.keys(byDate).sort();
 
@@ -187,17 +229,17 @@ const Gym = (() => {
       data: {
         labels: dates.map(formatDateLabel),
         datasets: [
-          { label: 'Max Weight (lb)', data: dates.map(d => Math.round(byDate[d].maxWeight)), borderColor: '#2563eb', backgroundColor: 'transparent', tension: 0.25 },
-          { label: 'Est. 1RM (lb)', data: dates.map(d => Math.round(byDate[d].best1rm)), borderColor: '#f59e0b', backgroundColor: 'transparent', tension: 0.25 }
+          { label: `Max Weight (${displayUnit})`, data: dates.map(d => Math.round(byDate[d].maxWeight)), borderColor: '#2563eb', backgroundColor: 'transparent', tension: 0.25 },
+          { label: `Est. 1RM (${displayUnit})`, data: dates.map(d => Math.round(byDate[d].best1rm)), borderColor: '#f59e0b', backgroundColor: 'transparent', tension: 0.25 }
         ]
       },
       options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
 
-    renderStats(exercise, entries);
+    renderStats(entries);
   }
 
-  function renderStats(exercise, entries) {
+  function renderStats(entries) {
     const el = document.getElementById('exerciseStats');
     if (entries.length === 0) {
       el.innerHTML = '<p class="muted small">No data yet for this exercise.</p>';
@@ -205,16 +247,16 @@ const Gym = (() => {
     }
     let maxWeight = 0, maxWeightReps = 0, maxReps = 0, best1rm = 0;
     entries.forEach(e => {
-      const lb = toLb(e.weight, e.unit);
-      if (lb > maxWeight) { maxWeight = lb; maxWeightReps = e.reps; }
+      const w = convertToDisplay(e.weight, e.unit);
+      if (w > maxWeight) { maxWeight = w; maxWeightReps = e.reps; }
       if (e.reps > maxReps) maxReps = e.reps;
-      best1rm = Math.max(best1rm, epley1RM(lb, e.reps));
+      best1rm = Math.max(best1rm, epley1RM(w, e.reps));
     });
     el.innerHTML = `
-      <div class="stat"><span class="stat-label">Max Weight</span><span class="stat-value">${Math.round(maxWeight)} lb</span></div>
+      <div class="stat"><span class="stat-label">Max Weight</span><span class="stat-value">${Math.round(maxWeight)} ${displayUnit}</span></div>
       <div class="stat"><span class="stat-label">At Reps</span><span class="stat-value">${maxWeightReps}</span></div>
       <div class="stat"><span class="stat-label">Max Reps (any set)</span><span class="stat-value">${maxReps}</span></div>
-      <div class="stat"><span class="stat-label">Est. 1RM</span><span class="stat-value">${Math.round(best1rm)} lb</span></div>
+      <div class="stat"><span class="stat-label">Est. 1RM</span><span class="stat-value">${Math.round(best1rm)} ${displayUnit}</span></div>
     `;
   }
 
@@ -232,14 +274,14 @@ const Gym = (() => {
     const body = document.getElementById('gymLogTableBody');
     body.innerHTML = '';
     rows.forEach(g => {
-      const setsStr = g.sets.map(s => `${s.weight}${s.unit}x${s.reps}`).join(', ');
-      const best = g.sets.reduce((m, s) => Math.max(m, toLb(s.weight, s.unit)), 0);
+      const setsStr = g.sets.map(s => `${Math.round(convertToDisplay(s.weight, s.unit) * 10) / 10}${displayUnit}x${s.reps}`).join(', ');
+      const best = g.sets.reduce((m, s) => Math.max(m, convertToDisplay(s.weight, s.unit)), 0);
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${formatDateLabel(g.date)}</td>
         <td>${escapeHtml(g.exercise)}</td>
         <td>${escapeHtml(setsStr)}</td>
-        <td>${Math.round(best)} lb</td>
+        <td>${Math.round(best)} ${displayUnit}</td>
         <td><button class="btn-danger" data-del-group="${g.date}__${g.exercise}">&times;</button></td>
       `;
       body.appendChild(tr);
@@ -254,43 +296,59 @@ const Gym = (() => {
     });
   }
 
-  // ---------- Strava activities (cardio) ----------
+  // ---------- Session length & calories burned ----------
 
-  function renderStravaActivities() {
-    const body = document.getElementById('stravaActivityTableBody');
-    const emptyMsg = document.getElementById('stravaGymEmptyMsg');
-    const activities = (typeof Strava !== 'undefined') ? Strava.getCachedActivities() : [];
+  function caloriesForSession(minutes, intensity) {
+    const weightKg = (typeof Calories !== 'undefined' ? Calories.getWeightKg() : null) || DEFAULT_WEIGHT_KG;
+    const met = MET[intensity] || MET.moderate;
+    return (met * 3.5 * weightKg / 200) * minutes;
+  }
+
+  function getCaloriesBurnedForDate(iso) {
+    const sessions = getSessions();
+    const s = sessions[iso];
+    if (!s) return 0;
+    return caloriesForSession(s.minutes, s.intensity);
+  }
+
+  function renderSessionTable() {
+    const dates = Array.from(new Set(getLog().map(e => e.date))).sort().reverse();
+    const sessions = getSessions();
+    const body = document.getElementById('gymSessionTableBody');
     body.innerHTML = '';
-    activities.forEach(a => {
-      const km = a.distanceMeters ? (a.distanceMeters / 1000).toFixed(2) + ' km' : '-';
-      const mins = a.movingTimeSec ? Math.round(a.movingTimeSec / 60) + ' min' : '-';
+    dates.forEach(date => {
+      const s = sessions[date] || { minutes: 45, intensity: 'moderate' };
+      const kcal = Math.round(caloriesForSession(s.minutes, s.intensity));
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${formatDateLabel(a.date)}</td>
-        <td>${escapeHtml(a.name)}</td>
-        <td>${escapeHtml(a.type)}</td>
-        <td>${km}</td>
-        <td>${mins}</td>
-        <td>${a.calories || 0}</td>
+        <td>${formatDateLabel(date)}</td>
+        <td><input type="number" min="0" step="5" value="${s.minutes}" data-date="${date}" data-field="minutes" style="width:80px"></td>
+        <td>
+          <select data-date="${date}" data-field="intensity">
+            <option value="light" ${s.intensity === 'light' ? 'selected' : ''}>Light</option>
+            <option value="moderate" ${s.intensity === 'moderate' ? 'selected' : ''}>Moderate</option>
+            <option value="vigorous" ${s.intensity === 'vigorous' ? 'selected' : ''}>Vigorous</option>
+          </select>
+        </td>
+        <td>${kcal} kcal</td>
       `;
       body.appendChild(tr);
     });
-    emptyMsg.hidden = activities.length > 0;
-  }
-
-  async function syncStrava() {
-    if (typeof Strava === 'undefined' || !Strava.isConnected()) {
-      alert('Connect Strava first using the button in the top right.');
-      return;
-    }
-    try {
-      await Strava.syncActivities();
-      renderStravaActivities();
-      Calories.renderSummary();
-      Calories.renderHistory();
-    } catch (e) {
-      alert('Strava sync failed: ' + e.message);
-    }
+    body.querySelectorAll('[data-field]').forEach(input => {
+      input.addEventListener('change', (e) => {
+        const date = e.target.dataset.date;
+        const field = e.target.dataset.field;
+        const sessions = getSessions();
+        if (!sessions[date]) sessions[date] = { minutes: 45, intensity: 'moderate' };
+        sessions[date][field] = field === 'minutes' ? Number(e.target.value) : e.target.value;
+        saveSessions(sessions);
+        renderSessionTable();
+        Calories.renderSummary();
+        Calories.renderHistory();
+        Calories.renderTrend();
+      });
+    });
+    document.getElementById('gymSessionEmptyMsg').hidden = dates.length > 0;
   }
 
   function escapeHtml(str) {
@@ -303,7 +361,7 @@ const Gym = (() => {
     populateExerciseSelect();
     renderExerciseChart();
     renderLogTable();
-    renderStravaActivities();
+    renderSessionTable();
   }
 
   function init() {
@@ -315,10 +373,10 @@ const Gym = (() => {
     document.getElementById('saveGymBtn').addEventListener('click', saveGymLog);
     document.getElementById('cancelGymBtn').addEventListener('click', cancelPreview);
     document.getElementById('exerciseSelect').addEventListener('change', renderExerciseChart);
-    document.getElementById('syncStravaGymBtn').addEventListener('click', syncStrava);
+    initUnitToggle();
 
     refreshAll();
   }
 
-  return { init, refreshAll, renderStravaActivities };
+  return { init, refreshAll, getCaloriesBurnedForDate };
 })();
