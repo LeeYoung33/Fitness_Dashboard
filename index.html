@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Fitness Dashboard</h1>
+  <button id="stravaHeaderBtn" class="btn btn-strava">
+    <span id="stravaHeaderDot" class="dot dot-off"></span>
+    <span id="stravaHeaderLabel">Connect Strava</span>
+  </button>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="calories">Calorie Tracker</button>
+  <button class="tab-btn" data-tab="gym">Gym Progress</button>
+</nav>
+
+<main>
+
+  <!-- ===================== CALORIE TAB ===================== -->
+  <section id="tab-calories" class="tab-panel active">
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>Profile & Targets</h2>
+        <form id="profileForm" class="form-grid">
+          <label>Weight
+            <div class="input-with-unit">
+              <input type="number" step="0.1" id="profWeight" placeholder="e.g. 78.5">
+              <select id="profWeightUnit"><option value="kg">kg</option><option value="lb">lb</option></select>
+            </div>
+          </label>
+          <label>Height
+            <div class="input-with-unit">
+              <input type="number" step="0.1" id="profHeight" placeholder="e.g. 178">
+              <select id="profHeightUnit"><option value="cm">cm</option><option value="in">in</option></select>
+            </div>
+          </label>
+          <label>Daily Calorie Limit (kcal)
+            <input type="number" id="profCalLimit" placeholder="e.g. 2200">
+          </label>
+          <label>Protein Target (g)
+            <input type="number" id="profProtein" placeholder="e.g. 160">
+          </label>
+          <label>Carbs Target (g)
+            <input type="number" id="profCarbs" placeholder="e.g. 220">
+          </label>
+          <label>Fat Target (g)
+            <input type="number" id="profFat" placeholder="e.g. 70">
+          </label>
+          <button type="submit" class="btn btn-primary">Save Profile</button>
+        </form>
+        <p id="bmiLine" class="muted small"></p>
+      </div>
+
+      <div class="card">
+        <h2>Today's Summary <span id="summaryDateLabel" class="muted small"></span></h2>
+        <div class="summary-grid">
+          <div class="stat">
+            <span class="stat-label">Consumed</span>
+            <span class="stat-value" id="sumConsumed">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Exercise (Strava)</span>
+            <span class="stat-value" id="sumExercise">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Remaining</span>
+            <span class="stat-value" id="sumRemaining">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label" id="sumDeficitLabel">Deficit</span>
+            <span class="stat-value" id="sumDeficit">0</span>
+          </div>
+        </div>
+        <div class="macro-bars">
+          <div class="macro-bar">
+            <div class="macro-label"><span>Protein</span><span id="macroProteinText">0 / 0 g</span></div>
+            <div class="bar"><div class="bar-fill protein" id="macroProteinBar"></div></div>
+          </div>
+          <div class="macro-bar">
+            <div class="macro-label"><span>Carbs</span><span id="macroCarbsText">0 / 0 g</span></div>
+            <div class="bar"><div class="bar-fill carbs" id="macroCarbsBar"></div></div>
+          </div>
+          <div class="macro-bar">
+            <div class="macro-label"><span>Fat</span><span id="macroFatText">0 / 0 g</span></div>
+            <div class="bar"><div class="bar-fill fat" id="macroFatBar"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header-row">
+        <h2>Food Log</h2>
+        <input type="date" id="foodDatePicker">
+      </div>
+      <form id="foodForm" class="form-row">
+        <input type="text" id="foodName" placeholder="Food name" required>
+        <input type="number" id="foodCalories" placeholder="kcal" required>
+        <input type="number" id="foodProtein" placeholder="protein g" value="0">
+        <input type="number" id="foodCarbs" placeholder="carbs g" value="0">
+        <input type="number" id="foodFat" placeholder="fat g" value="0">
+        <button type="submit" class="btn btn-primary">Add</button>
+      </form>
+      <table class="table" id="foodTable">
+        <thead><tr><th>Time</th><th>Food</th><th>kcal</th><th>P</th><th>C</th><th>F</th><th></th></tr></thead>
+        <tbody id="foodTableBody"></tbody>
+      </table>
+      <p id="foodEmptyMsg" class="muted small">No foods logged for this day yet.</p>
+    </div>
+
+    <div class="card">
+      <h2>Trend (last 14 days)</h2>
+      <canvas id="calorieTrendChart" height="90"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <table class="table" id="historyTable">
+        <thead><tr><th>Date</th><th>Consumed</th><th>Exercise</th><th>Limit</th><th>Net Deficit</th></tr></thead>
+        <tbody id="historyTableBody"></tbody>
+      </table>
+    </div>
+
+  </section>
+
+  <!-- ===================== GYM TAB ===================== -->
+  <section id="tab-gym" class="tab-panel">
+
+    <div class="card">
+      <h2>Paste Workout Notes</h2>
+      <p class="muted small">
+        Paste raw text copied from Apple Notes. Works best with a date line, then exercise names, then sets like
+        <code>135x10, 155x8, 175x5</code> or <code>135 lbs x 10 reps</code> on their own line(s).
+      </p>
+      <textarea id="gymPasteBox" rows="10" placeholder="9/9/2026
+Bench Press
+135x10, 155x8, 175x5
+Squat
+225x5, 225x5, 245x3
+
+9/11/2026
+Deadlift
+315x5, 335x3, 365x1"></textarea>
+      <button id="parseNotesBtn" class="btn btn-primary">Parse Notes</button>
+      <button id="clearPasteBtn" class="btn btn-secondary">Clear</button>
+    </div>
+
+    <div class="card" id="gymPreviewCard" hidden>
+      <h2>Review Parsed Sets</h2>
+      <p class="muted small">Check the parsed results below, fix anything that looks wrong, then save.</p>
+      <table class="table" id="gymPreviewTable">
+        <thead><tr><th>Date</th><th>Exercise</th><th>Weight</th><th>Unit</th><th>Reps</th><th></th></tr></thead>
+        <tbody id="gymPreviewBody"></tbody>
+      </table>
+      <button id="addPreviewRowBtn" class="btn btn-secondary">+ Add Row</button>
+      <button id="saveGymBtn" class="btn btn-primary">Save to Log</button>
+      <button id="cancelGymBtn" class="btn btn-secondary">Cancel</button>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>Progress Over Time</h2>
+        <label>Exercise
+          <select id="exerciseSelect"></select>
+        </label>
+        <canvas id="exerciseChart" height="180"></canvas>
+      </div>
+      <div class="card">
+        <h2>Personal Bests</h2>
+        <div id="exerciseStats" class="summary-grid"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Full Workout Log</h2>
+      <table class="table" id="gymLogTable">
+        <thead><tr><th>Date</th><th>Exercise</th><th>Sets</th><th>Best</th><th></th></tr></thead>
+        <tbody id="gymLogTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header-row">
+        <h2>Strava Activities</h2>
+        <button id="syncStravaGymBtn" class="btn btn-secondary">Sync Now</button>
+      </div>
+      <table class="table" id="stravaActivityTable">
+        <thead><tr><th>Date</th><th>Activity</th><th>Type</th><th>Distance</th><th>Duration</th><th>kcal</th></tr></thead>
+        <tbody id="stravaActivityTableBody"></tbody>
+      </table>
+      <p id="stravaGymEmptyMsg" class="muted small">Connect Strava (top right) to see your activities here.</p>
+    </div>
+
+  </section>
+
+</main>
+
+<!-- ===================== STRAVA MODAL ===================== -->
+<div id="stravaModal" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Strava Integration</h2>
+      <button id="closeStravaModal" class="btn-close">&times;</button>
+    </div>
+
+    <div id="stravaStep1">
+      <p class="muted small">
+        Strava's API is free for personal use. Create an app at
+        <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a>
+        (Authorization Callback Domain: <code id="callbackDomainHint"></code>), then paste your credentials below.
+      </p>
+      <form id="stravaCredForm" class="form-grid">
+        <label>Client ID <input type="text" id="stravaClientId"></label>
+        <label>Client Secret <input type="password" id="stravaClientSecret"></label>
+        <button type="submit" class="btn btn-primary">Save Credentials</button>
+      </form>
+    </div>
+
+    <div id="stravaStep2">
+      <hr>
+      <p class="status-line" id="stravaStatusLine">Not connected.</p>
+      <button id="stravaConnectBtn" class="btn btn-strava">Connect to Strava</button>
+      <button id="stravaDisconnectBtn" class="btn btn-secondary" hidden>Disconnect</button>
+    </div>
+
+    <div id="stravaManualFallback" hidden>
+      <hr>
+      <h3>Manual token exchange (if Connect fails with a CORS error)</h3>
+      <p class="muted small">
+        Some browsers block Strava's token endpoint from being called directly by client-side JavaScript.
+        If that happens, run this command in a terminal once you have a <code>code</code> from the authorize step,
+        then paste the resulting tokens below.
+      </p>
+      <pre id="curlCommand" class="code-block"></pre>
+      <form id="manualTokenForm" class="form-grid">
+        <label>Access Token <input type="text" id="manualAccessToken"></label>
+        <label>Refresh Token <input type="text" id="manualRefreshToken"></label>
+        <label>Expires At (unix seconds) <input type="text" id="manualExpiresAt"></label>
+        <button type="submit" class="btn btn-primary">Save Tokens</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/strava.js"></script>
+<script src="js/calories.js"></script>
+<script src="js/gym.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
