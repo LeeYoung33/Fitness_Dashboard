@@ -215,3 +215,40 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 }
 .unit-btn + .unit-btn { border-left: 1px solid var(--border); }
 .unit-btn.active { background: var(--primary); color: white; }
+
+/* Food photo logging */
+.photo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.photo-row .btn:disabled { opacity: 0.6; cursor: default; }
+.photo-review { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+.photo-review-head { display: flex; gap: 12px; align-items: flex-start; }
+.photo-review-head h3 { margin: 0 0 4px; font-size: 1rem; }
+.photo-review-head p { margin: 0 0 4px; }
+.photo-thumb { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.photo-notes { color: var(--text); font-style: italic; }
+#photoTable .pr-name { width: 30%; }
+#photoTable .pr-portion { width: 28%; }
+#photoTotals { font-weight: 600; margin: 10px 0; }
+
+/* On phones each item becomes a small stacked card so nothing scrolls sideways. */
+@media (max-width: 640px) {
+  #photoTable thead { display: none; }
+  #photoTable, #photoTable tbody { display: block; }
+  #photoTable tr {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #photoTable td { border: none; padding: 0; }
+  #photoTable .pr-name { grid-column: 1 / 4; }
+  #photoTable .pr-remove { grid-column: 4; text-align: right; }
+  #photoTable .pr-portion { grid-column: 1 / -1; }
+  #photoTable td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+  }
+}

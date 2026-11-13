@@ -2,10 +2,10 @@
 
 A single-page fitness dashboard with two tabs:
 
-- **Calorie Tracker** — set your weight, height, calorie limit, and macro targets; log food throughout the day; see a running daily summary (calories, macros, deficit/surplus), a 14-day trend chart, and history.
+- **Calorie Tracker** — set your weight, height, calorie limit, and macro targets; log food throughout the day by typing it in or by taking a photo of your meal; see a running daily summary (calories, macros, deficit/surplus), a 14-day trend chart, and history.
 - **Gym Progress** — paste raw workout notes (e.g. copied from Apple Notes), review/edit the parsed sets, and track progress per exercise with a line chart of max weight and estimated 1RM over time, plus personal bests. Toggle weights between lb/kg. Each logged session estimates calories burned (by duration + intensity + your body weight) and feeds that back into the Calorie Tracker's daily budget.
 
-It's a static site (HTML/CSS/JS) plus one small serverless function for the login gate, built to run on [Vercel](https://vercel.com)'s free tier. Data (profile, food log, gym log) lives in your browser's `localStorage` only — private to whichever device/browser you use it on.
+It's a static site (HTML/CSS/JS) plus two small serverless functions (the login gate and food-photo analysis), built to run on [Vercel](https://vercel.com)'s free tier. Data (profile, food log, gym log) lives in your browser's `localStorage` only — private to whichever device/browser you use it on.
 
 ## Deploying it (free, on Vercel)
 
@@ -29,14 +29,15 @@ From then on, every `git push` to `main` auto-deploys.
 npx vercel dev
 ```
 
-This serves the static files and the `/api/login` function together the same way Vercel does in production. Add a `.env.local` file (gitignored) with `AUTH_NAME=...` and `AUTH_PIN=...` for local testing.
+This serves the static files and the `/api/login` function together the same way Vercel does in production. Add a `.env.local` file (gitignored) with `AUTH_NAME=...`, `AUTH_PIN=...`, and (for photo logging) `ANTHROPIC_API_KEY=...` for local testing.
 
 ## Calorie Tracker
 
 1. Fill in your weight, height, daily calorie limit, and protein/carb/fat targets under **Profile & Targets**, then Save.
 2. Add foods as you eat them via the **Food Log** form (name, calories, and macros).
-3. The **Today's Summary** card tallies your totals live and shows remaining calories (limit + estimated gym-session calories − consumed).
-4. **Trend** and **History** show your last 14–30 days.
+3. Or tap **Log from Photo** and take or choose a picture of your meal. The photo is sent to Claude, which lists each food it sees with an estimated portion, calories, and macros. Nothing is logged until you review the list — edit any name or number, remove items, add missing ones — and tap **Add to Log**. These are estimates; portions and hidden ingredients (oil, sauces) are the usual sources of error.
+4. The **Today's Summary** card tallies your totals live and shows remaining calories (limit + estimated gym-session calories − consumed).
+5. **Trend** and **History** show your last 14–30 days.
 
 ## Gym Progress
 
@@ -56,4 +57,6 @@ Strava eliminated its free API tier, so this dashboard estimates exercise calori
 
 ## Data & privacy
 
-Profile, food log, and gym log all live in `localStorage` in your browser only — nothing is sent to a server except your name/PIN at login. Clearing your browser data / site data will erase it. There is no database; the only server-side code is the login check.
+Profile, food log, and gym log all live in `localStorage` in your browser only — nothing is sent to a server except your name/PIN at login and any meal photos you choose to analyze. Photos are shrunk in the browser, passed through `/api/analyze-food` to the Anthropic API, and not stored by this app. Clearing your browser data / site data will erase your logs, so use **Export** in the header to keep a backup. There is no database.
+
+Because photo analysis costs money, `/api/analyze-food` only accepts requests carrying the signed session token issued by `/api/login`. If you were logged in before this feature was added, log out and back in once to get a token.

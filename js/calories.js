@@ -116,6 +116,24 @@ const Calories = (() => {
     renderTrend();
   }
 
+  // Used by the photo flow: log several confirmed items at once to the selected date.
+  function addEntries(items) {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    items.forEach(it => addFoodEntry({
+      id: uid(),
+      time,
+      name: it.name,
+      calories: Number(it.calories) || 0,
+      protein: Number(it.protein) || 0,
+      carbs: Number(it.carbs) || 0,
+      fat: Number(it.fat) || 0
+    }));
+    renderFoodTable();
+    renderSummary();
+    renderHistory();
+    renderTrend();
+  }
+
   function renderFoodTable() {
     const entries = getEntriesForDate(selectedDate);
     const body = document.getElementById('foodTableBody');
@@ -276,5 +294,5 @@ const Calories = (() => {
     renderTrend();
   }
 
-  return { init, renderSummary, renderHistory, renderTrend, getWeightKg };
+  return { init, renderSummary, renderHistory, renderTrend, getWeightKg, addEntries };
 })();
