@@ -1,10 +1,4 @@
-const crypto = require('crypto');
-
-function safeEqual(a, b) {
-  const ha = crypto.createHash('sha256').update(String(a)).digest();
-  const hb = crypto.createHash('sha256').update(String(b)).digest();
-  return crypto.timingSafeEqual(ha, hb);
-}
+const { safeEqual, createToken } = require('./_auth');
 
 const SESSION_MS = 1000 * 60 * 60 * 24 * 180; // 180 days
 
@@ -27,13 +21,16 @@ module.exports = async (req, res) => {
     try { body = JSON.parse(body); } catch (e) { body = {}; }
   }
   const { name, pin } = body || {};
-  const gotName = (name || '').trim().toLowerCase();
-  const gotPin = (pin || '').trim();
+  const gotName = String(name || '').trim().toLowerCase();
+  const gotPin = String(pin || '').trim();
 
   if (!gotName || !gotPin || !safeEqual(gotName, expectedName) || !safeEqual(gotPin, expectedPin)) {
     res.status(401).json({ error: 'Incorrect name or PIN.' });
     return;
   }
 
-  res.status(200).json({ ok: true, name, expiresAt: Date.now() + SESSION_MS });
+  // The token is what the other API endpoints check; the page itself only
+  // looks at expiresAt.
+  const expiresAt = Date.now() + SESSION_MS;
+  res.status(200).json({ ok: true, name: String(name), expiresAt, token: createToken(expiresAt) });
 };

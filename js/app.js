@@ -75,5 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initBackup();
   Gym.syncSessionsWithLog();
   Calories.init();
+  FoodPhoto.init();
   Gym.init();
 });

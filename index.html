@@ -123,6 +123,32 @@
         <input type="number" id="foodFat" placeholder="fat g" value="0">
         <button type="submit" class="btn btn-primary">Add</button>
       </form>
+
+      <div class="photo-row">
+        <button type="button" id="photoBtn" class="btn btn-primary">Log from Photo</button>
+        <input type="file" id="photoInput" accept="image/*" hidden>
+        <span id="photoStatus" class="status-line muted" hidden></span>
+      </div>
+
+      <div id="photoReview" class="photo-review" hidden>
+        <div class="photo-review-head">
+          <img id="photoThumb" class="photo-thumb" alt="Photo being logged">
+          <div>
+            <h3>Is this what you ate?</h3>
+            <p class="muted small">These are estimates from your photo. Fix anything that's off, remove what you didn't eat, then add it to your log.</p>
+            <p id="photoNotes" class="small photo-notes" hidden></p>
+          </div>
+        </div>
+        <table class="table" id="photoTable">
+          <thead><tr><th>Food</th><th>Portion</th><th>kcal</th><th>P</th><th>C</th><th>F</th><th></th></tr></thead>
+          <tbody id="photoTableBody"></tbody>
+        </table>
+        <p id="photoTotals" class="small"></p>
+        <button type="button" id="photoAddRowBtn" class="btn btn-secondary">+ Add Row</button>
+        <button type="button" id="photoConfirmBtn" class="btn btn-primary">Add to Log</button>
+        <button type="button" id="photoCancelBtn" class="btn btn-secondary">Cancel</button>
+      </div>
+
       <table class="table" id="foodTable">
         <thead><tr><th>Time</th><th>Food</th><th>kcal</th><th>P</th><th>C</th><th>F</th><th></th></tr></thead>
         <tbody id="foodTableBody"></tbody>
@@ -228,6 +254,7 @@ Deadlift
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/calories.js"></script>
+<script src="js/foodphoto.js"></script>
 <script src="js/gym.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -49,7 +49,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed');
-    localStorage.setItem('fd_auth', JSON.stringify({ name: data.name, expiresAt: data.expiresAt }));
+    localStorage.setItem('fd_auth', JSON.stringify({ name: data.name, expiresAt: data.expiresAt, token: data.token }));
     window.location.replace('index.html');
   } catch (err) {
     errEl.textContent = err.message;
