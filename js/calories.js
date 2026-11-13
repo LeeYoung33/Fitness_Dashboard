@@ -1,5 +1,6 @@
 const Calories = (() => {
   let selectedDate = todayISO();
+  let currentToday = selectedDate;
   let trendChart = null;
 
   function getProfile() {
@@ -213,7 +214,8 @@ const Calories = (() => {
     const limitLine = days.map(() => profile.calorieLimit || 0);
 
     const ctx = document.getElementById('calorieTrendChart');
-    if (trendChart) trendChart.destroy();
+    if (trendChart) { trendChart.destroy(); trendChart = null; }
+    if (typeof Chart === 'undefined') return; // CDN unreachable (offline) — skip the chart, keep the app working
     trendChart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -233,10 +235,19 @@ const Calories = (() => {
     renderSummary();
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  // The page can stay open for days (home-screen app). When the calendar day
+  // changes, follow it — unless the user deliberately picked another date.
+  function checkDayRollover() {
+    const now = todayISO();
+    if (now === currentToday) return;
+    const wasOnToday = selectedDate === currentToday;
+    currentToday = now;
+    if (wasOnToday) {
+      document.getElementById('foodDatePicker').value = now;
+      setSelectedDate(now);
+    }
+    renderHistory();
+    renderTrend();
   }
 
   function getWeightKg() {
@@ -247,7 +258,13 @@ const Calories = (() => {
 
   function init() {
     document.getElementById('foodDatePicker').value = selectedDate;
-    document.getElementById('foodDatePicker').addEventListener('change', (e) => setSelectedDate(e.target.value));
+    document.getElementById('foodDatePicker').addEventListener('change', (e) => {
+      // Clearing the picker would log food under an empty date; snap back instead.
+      if (!e.target.value) { e.target.value = selectedDate; return; }
+      setSelectedDate(e.target.value);
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDayRollover(); });
+    setInterval(checkDayRollover, 60 * 1000);
     document.getElementById('profileForm').addEventListener('submit', saveProfileForm);
     document.getElementById('foodForm').addEventListener('submit', addFoodFormHandler);
 

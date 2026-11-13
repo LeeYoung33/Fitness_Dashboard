@@ -22,7 +22,12 @@
 
 <header class="topbar">
   <h1>Fitness Dashboard</h1>
-  <button id="logoutBtn" class="btn btn-secondary">Log out</button>
+  <div class="topbar-actions">
+    <button id="exportBtn" class="btn btn-secondary">Export</button>
+    <button id="importBtn" class="btn btn-secondary">Import</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <button id="logoutBtn" class="btn btn-secondary">Log out</button>
+  </div>
 </header>
 
 <nav class="tabs">
