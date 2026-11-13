@@ -42,6 +42,8 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .topbar h1 { font-size: 1.3rem; margin: 0; }
+.topbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.topbar-actions .btn-secondary { margin-left: 0; }
 
 .tabs {
   display: flex;

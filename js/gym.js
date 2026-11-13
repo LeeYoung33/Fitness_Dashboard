@@ -5,6 +5,7 @@ const Gym = (() => {
 
   const MET = { light: 3.5, moderate: 5.0, vigorous: 6.0 };
   const DEFAULT_WEIGHT_KG = 75;
+  const DEFAULT_SESSION = { minutes: 45, intensity: 'moderate' };
 
   function getLog() {
     return Storage.get(Keys.GYM_LOG, []);
@@ -22,19 +23,41 @@ const Gym = (() => {
   // ---------- Parsing ----------
 
   const SLASH_DATE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
-  const SET_RE = /(\d+(?:\.\d+)?)\s*(kgs?|kilos?|lbs?|pounds?)?\s*x\s*(\d+)\s*(?:reps?)?/gi;
+  // e.g. "Sept 9", "Sep 9, 2026", "Monday, September 9th"
+  const MONTH_DATE_RE = /^(?:([A-Za-z]+),?\s+)?([A-Za-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?$/;
+  const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  // "bw" / "bodyweight" count as weight 0 (pull-ups, dips, etc.)
+  const SET_RE = /\b(\d+(?:\.\d+)?|bw|bodyweight)\s*(kgs?|kilos?|lbs?|pounds?)?\s*x\s*(\d+)\s*(?:reps?)?/gi;
+
+  // Accepts full names or abbreviations of at least 3 letters ("Sep", "Sept", "September").
+  function matchName(word, names) {
+    const w = word.toLowerCase();
+    if (w.length < 3) return -1;
+    return names.findIndex(n => n.startsWith(w));
+  }
+
+  // Returns ISO date, or null if the parts don't form a real calendar date (e.g. 2/31).
+  function buildDate(y, monthIdx, d) {
+    const dt = new Date(y, monthIdx, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== monthIdx || dt.getDate() !== d) return null;
+    return dateToISO(dt);
+  }
 
   function tryParseDateLine(line) {
     const m = line.match(SLASH_DATE_RE);
     if (m) {
       let [, mo, d, y] = m;
       y = y.length === 2 ? '20' + y : y;
-      const dt = new Date(Number(y), Number(mo) - 1, Number(d));
-      if (!isNaN(dt.getTime())) return dateToISO(dt);
+      return buildDate(Number(y), Number(mo) - 1, Number(d));
     }
-    if (/^[A-Za-z]+\.?\s+\d{1,2}(st|nd|rd|th)?(,?\s*\d{4})?$/.test(line) || /^[A-Za-z]+,\s*[A-Za-z]+\s+\d{1,2}/.test(line)) {
-      const parsed = Date.parse(line.replace(/(st|nd|rd|th)/, ''));
-      if (!isNaN(parsed)) return dateToISO(new Date(parsed));
+    const mm = line.match(MONTH_DATE_RE);
+    if (mm) {
+      const [, weekday, monthWord, d, y] = mm;
+      if (weekday && matchName(weekday, WEEKDAY_NAMES) === -1) return null;
+      const monthIdx = matchName(monthWord, MONTH_NAMES);
+      if (monthIdx === -1) return null;
+      return buildDate(y ? Number(y) : new Date().getFullYear(), monthIdx, Number(d));
     }
     return null;
   }
@@ -44,7 +67,7 @@ const Gym = (() => {
     let match;
     SET_RE.lastIndex = 0;
     while ((match = SET_RE.exec(line)) !== null) {
-      const weight = parseFloat(match[1]);
+      const weight = /^b/i.test(match[1]) ? 0 : parseFloat(match[1]);
       const unitRaw = (match[2] || '').toLowerCase();
       const unit = unitRaw.startsWith('k') ? 'kg' : 'lb';
       const reps = parseInt(match[3], 10);
@@ -140,7 +163,18 @@ const Gym = (() => {
 
   function saveGymLog() {
     const existing = getLog();
-    const cleaned = previewRows.filter(r => r.exercise && r.weight > 0 && r.reps > 0);
+    const cleaned = previewRows.filter(r => r.date && r.exercise && r.weight >= 0 && r.reps > 0);
+
+    // Guard against pasting the same notes twice.
+    const existingKeys = new Set(existing.map(e => `${e.date}__${e.exercise}`));
+    const dupes = Array.from(new Set(cleaned
+      .filter(r => existingKeys.has(`${r.date}__${r.exercise}`))
+      .map(r => `${r.exercise} on ${formatDateLabel(r.date)}`)));
+    if (dupes.length > 0) {
+      const list = dupes.slice(0, 5).join('\n') + (dupes.length > 5 ? `\n…and ${dupes.length - 5} more` : '');
+      if (!confirm(`Already in your log:\n${list}\n\nSave anyway? These sets will be added alongside the existing ones.`)) return;
+    }
+
     saveLog(existing.concat(cleaned));
 
     // Ensure every new session date has a default duration/intensity so it
@@ -148,7 +182,7 @@ const Gym = (() => {
     const sessions = getSessions();
     const newDates = new Set(cleaned.map(r => r.date));
     newDates.forEach(date => {
-      if (!sessions[date]) sessions[date] = { minutes: 45, intensity: 'moderate' };
+      if (!sessions[date]) sessions[date] = { ...DEFAULT_SESSION };
     });
     saveSessions(sessions);
 
@@ -204,7 +238,8 @@ const Gym = (() => {
     const select = document.getElementById('exerciseSelect');
     const names = uniqueExercises();
     const prev = select.value;
-    select.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    select.innerHTML = '';
+    names.forEach(n => select.add(new Option(n, n)));
     if (names.includes(prev)) select.value = prev;
   }
 
@@ -221,9 +256,11 @@ const Gym = (() => {
     });
     const dates = Object.keys(byDate).sort();
 
+    renderStats(entries);
+
     const ctx = document.getElementById('exerciseChart');
-    if (exerciseChart) exerciseChart.destroy();
-    if (dates.length === 0) return;
+    if (exerciseChart) { exerciseChart.destroy(); exerciseChart = null; }
+    if (dates.length === 0 || typeof Chart === 'undefined') return;
     exerciseChart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -235,8 +272,6 @@ const Gym = (() => {
       },
       options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
-
-    renderStats(entries);
   }
 
   function renderStats(entries) {
@@ -274,26 +309,57 @@ const Gym = (() => {
     const body = document.getElementById('gymLogTableBody');
     body.innerHTML = '';
     rows.forEach(g => {
-      const setsStr = g.sets.map(s => `${Math.round(convertToDisplay(s.weight, s.unit) * 10) / 10}${displayUnit}x${s.reps}`).join(', ');
+      const setsStr = g.sets.map(s => s.weight === 0
+        ? `BWx${s.reps}`
+        : `${Math.round(convertToDisplay(s.weight, s.unit) * 10) / 10}${displayUnit}x${s.reps}`).join(', ');
       const best = g.sets.reduce((m, s) => Math.max(m, convertToDisplay(s.weight, s.unit)), 0);
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${formatDateLabel(g.date)}</td>
         <td>${escapeHtml(g.exercise)}</td>
         <td>${escapeHtml(setsStr)}</td>
-        <td>${Math.round(best)} ${displayUnit}</td>
-        <td><button class="btn-danger" data-del-group="${g.date}__${g.exercise}">&times;</button></td>
+        <td>${best > 0 ? `${Math.round(best)} ${displayUnit}` : 'BW'}</td>
+        <td><button class="btn-danger">&times;</button></td>
       `;
+      tr.querySelector('.btn-danger').addEventListener('click', () => deleteGroup(g.date, g.exercise));
       body.appendChild(tr);
     });
-    body.querySelectorAll('[data-del-group]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const [date, exercise] = btn.dataset.delGroup.split('__');
-        const remaining = getLog().filter(e => !(e.date === date && e.exercise === exercise));
-        saveLog(remaining);
-        refreshAll();
-      });
+  }
+
+  function deleteGroup(date, exercise) {
+    const remaining = getLog().filter(e => !(e.date === date && e.exercise === exercise));
+    saveLog(remaining);
+    // Drop the session too once nothing is left on that date, so its
+    // calories stop counting toward the budget.
+    if (!remaining.some(e => e.date === date)) {
+      const sessions = getSessions();
+      delete sessions[date];
+      saveSessions(sessions);
+    }
+    refreshAll();
+    refreshCalories();
+  }
+
+  function refreshCalories() {
+    Calories.renderSummary();
+    Calories.renderHistory();
+    Calories.renderTrend();
+  }
+
+  // Older data may have workout dates with no session (shown with defaults
+  // but not counted) or sessions whose workouts were deleted (counted but
+  // hidden). Make the stored sessions match the log.
+  function syncSessionsWithLog() {
+    const logDates = new Set(getLog().map(e => e.date));
+    const sessions = getSessions();
+    let changed = false;
+    logDates.forEach(date => {
+      if (!sessions[date]) { sessions[date] = { ...DEFAULT_SESSION }; changed = true; }
     });
+    Object.keys(sessions).forEach(date => {
+      if (!logDates.has(date)) { delete sessions[date]; changed = true; }
+    });
+    if (changed) saveSessions(sessions);
   }
 
   // ---------- Session length & calories burned ----------
@@ -317,7 +383,7 @@ const Gym = (() => {
     const body = document.getElementById('gymSessionTableBody');
     body.innerHTML = '';
     dates.forEach(date => {
-      const s = sessions[date] || { minutes: 45, intensity: 'moderate' };
+      const s = sessions[date] || DEFAULT_SESSION;
       const kcal = Math.round(caloriesForSession(s.minutes, s.intensity));
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -339,22 +405,14 @@ const Gym = (() => {
         const date = e.target.dataset.date;
         const field = e.target.dataset.field;
         const sessions = getSessions();
-        if (!sessions[date]) sessions[date] = { minutes: 45, intensity: 'moderate' };
+        if (!sessions[date]) sessions[date] = { ...DEFAULT_SESSION };
         sessions[date][field] = field === 'minutes' ? Number(e.target.value) : e.target.value;
         saveSessions(sessions);
         renderSessionTable();
-        Calories.renderSummary();
-        Calories.renderHistory();
-        Calories.renderTrend();
+        refreshCalories();
       });
     });
     document.getElementById('gymSessionEmptyMsg').hidden = dates.length > 0;
-  }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
   }
 
   function refreshAll() {
@@ -378,5 +436,5 @@ const Gym = (() => {
     refreshAll();
   }
 
-  return { init, refreshAll, getCaloriesBurnedForDate };
+  return { init, refreshAll, getCaloriesBurnedForDate, syncSessionsWithLog };
 })();

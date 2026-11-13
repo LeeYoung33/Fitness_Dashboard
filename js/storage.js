@@ -18,11 +18,24 @@ const Storage = {
   set(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      return true;
     } catch (e) {
       console.error('Storage.set failed for', key, e);
+      alert('Could not save your changes: browser storage is full or unavailable. Export a backup before clearing anything.');
+      return false;
     }
   }
 };
+
+// Safe for both element content and quoted attribute values.
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
